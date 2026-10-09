@@ -7,11 +7,11 @@ Your privacy. Your files. Your rules.
 A private vault for photos, videos, documents, notes and web links, backed by Supabase.
 
 ## How it works
-- Sign in with email and password (Supabase Auth), then unlock with a 4-digit passcode.
+- No sign-up or login. On first open you create a 4-digit passcode; behind the scenes the browser gets a private anonymous Supabase session.
 - Everything is encrypted in your browser with AES-256 (key derived from your passcode with PBKDF2) **before** it's uploaded. Supabase only stores scrambled data.
 - Files go to a private Supabase Storage bucket (`vaultx`); notes, links and file details go to the `vaultx_items` table.
 - Row-level security means each account can only read its own rows and files.
-- Your vault syncs across any device you sign in on.
+- Your vault is tied to the browser you created it in. Clearing that browser's site data removes access.
 
 ## Features
 - Passcode lock screen
@@ -26,7 +26,7 @@ A private vault for photos, videos, documents, notes and web links, backed by Su
 - Function: `vaultx_rekey` (atomic passcode change)
 - Storage bucket: `vaultx` (private, per-user folders)
 
-In the Supabase dashboard, under **Authentication → URL Configuration**, set the Site URL to `https://drexskills.github.io/vaultx/` so email confirmation links come back to the site.
+Required: in the Supabase dashboard, turn on **Authentication → Sign In / Providers → Allow anonymous sign-ins**.
 
 ## Notes
 - There is no passcode recovery. If you forget it, you can only erase the vault.

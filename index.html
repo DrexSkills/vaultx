@@ -150,9 +150,7 @@ svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke
 #toast{position:fixed;left:50%;bottom:44px;transform:translate(-50%,20px);background:#13241b;border:1px solid #23503a;color:var(--text);padding:10px 16px;border-radius:12px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:99;max-width:90vw;text-align:center}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-.auth .form{width:100%;max-width:320px;margin-top:22px}
-.auth .sub{max-width:300px;line-height:1.5}
-.swap{color:var(--green);font-size:14px;font-weight:600;margin-top:16px;padding:6px}
+.offline .sub{max-width:300px;line-height:1.5}
 .center{align-items:center;justify-content:center}
 </style>
 </head>
@@ -228,7 +226,7 @@ const unseal=(key,iv,ct)=>crypto.subtle.decrypt({name:'AES-GCM',iv},key,ct);
 async function makeVerifier(key,salt){const v=await seal(key,enc.encode('vaultx-ok'));return{salt:b64(salt),v_iv:b64(v.iv),v_ct:b64(v.ct)}}
 
 /* ---------- State ---------- */
-const S={user:null,profile:null,key:null,screen:'loading',authMode:'signin',authMsg:'',stage:'create',pin:'',firstPin:'',msg:'',err:false,shake:false,busy:false,items:[],urls:{},cat:null,id:null,sad:0,t:null,importing:false,hiddenAt:0};
+const S={user:null,profile:null,key:null,screen:'loading',offlineMsg:'',stage:'create',pin:'',firstPin:'',msg:'',err:false,shake:false,busy:false,items:[],urls:{},cat:null,id:null,sad:0,t:null,importing:false,hiddenAt:0};
 const hasVault=()=>!!S.profile;
 const uid=()=>S.user.id;
 const newId=()=>(crypto.randomUUID?crypto.randomUUID():'10000000-1000-4000-8000-100000000000'.replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16)));
@@ -318,19 +316,12 @@ function row(i){
 
 const SCREENS={
   loading:()=>`<section class="screen center"><div class="spin"></div></section>`,
-  auth(){
-    const up=S.authMode==='signup';
-    return `<section class="screen lock auth">
+  offline(){
+    return `<section class="screen lock offline">
       <div class="logo">${LOCK}</div><div class="logoname">Vault<b>X</b></div>
-      <h2>${up?'Create your account':'Sign in to your vault'}</h2>
-      <p class="sub">Your vault syncs across your devices. Everything is encrypted before it leaves this one.</p>
-      <div class="form">
-        <label class="field"><span>Email</span><input id="ae" type="email" autocomplete="email" autocapitalize="off" inputmode="email"></label>
-        <label class="field"><span>Password</span><input id="ap" type="password" autocomplete="${up?'new-password':'current-password'}" minlength="8"></label>
-        <div class="ferr" id="aerr" style="${S.authMsg&&!S.err?'color:var(--green)':''}">${esc(S.authMsg)}</div>
-        <button class="btn" style="width:100%" data-a="doauth">${up?'Create account':'Sign in'}</button>
-      </div>
-      <button class="swap" data-a="swapauth">${up?'I already have an account':'New here? Create an account'}</button>
+      <h2>Can't open your vault</h2>
+      <p class="sub">${esc(S.offlineMsg)}</p>
+      <button class="btn" style="margin-top:22px" data-a="retrystart">Try again</button>
     </section>`;
   },
   lock(){
@@ -342,7 +333,7 @@ const SCREENS={
       <h2>${title}</h2><p class="sub ${S.err?'err':''}">${esc(sub)}</p>
       <div class="dots ${S.shake?'shake':''}" aria-label="${S.pin.length} of ${PIN_LEN} digits entered">${Array.from({length:PIN_LEN},(_,i)=>`<i class="${i<S.pin.length?'on':''}"></i>`).join('')}</div>
       <div class="pad">${'123456789'.split('').map(key).join('')}
-        <button class="k ghost" data-a="forgot">${has?'Forgot?':'Sign out'}</button>${key('0')}
+        <button class="k ghost" data-a="${has?'forgot':'noop'}">${has?'Forgot?':''}</button>${key('0')}
         <button class="k ghost" data-a="del" aria-label="Delete digit">${ic('backspace')}</button></div>
     </section>`;
   },
@@ -401,18 +392,16 @@ const SCREENS={
         <button class="item" data-a="autolock"><span class="ib">${ic('timer')}</span><span class="tx"><strong>Auto-lock</strong><small>${m?`Lock after ${plural(m,'minute')} of inactivity`:'Never lock automatically'}</small></span>${ic('chev','chev')}</button>
         <button class="item" data-a="lock"><span class="ib">${ic('locko')}</span><span class="tx"><strong>Lock now</strong></span></button>
       </div></div>
-      <div class="group"><h3>Account</h3><div class="list">
-        <div class="item"><span class="ib">${ic('user')}</span><span class="tx"><strong>${esc(S.user.email)}</strong><small>${plural(S.items.length,'item')} • ${fmtSize(used)} stored</small></span></div>
-        <button class="item" data-a="signout"><span class="ib">${ic('out')}</span><span class="tx"><strong>Sign out</strong></span></button>
+      <div class="group"><h3>Storage</h3><div class="list">
+        <div class="item"><span class="ib">${ic('folder')}</span><span class="tx"><strong>${plural(S.items.length,'item')} in your vault</strong><small>${fmtSize(used)} stored securely online</small></span></div>
         <button class="item bad" data-a="erase"><span class="ib">${ic('trash')}</span><span class="tx"><strong>Erase vault</strong><small>Deletes every item and your passcode</small></span></button>
       </div></div>
-      <p class="foot">Files are encrypted with AES-256 on your device before upload. The server only ever stores scrambled data.<br>There's no passcode recovery, so keep yours safe.</p>
+      <p class="foot">Files are encrypted with AES-256 on your device before upload. The server only ever stores scrambled data.<br>Your vault is tied to this browser. Clearing its site data removes access, and there's no passcode recovery.</p>
     </div>${tabbar('settings')}</section>`;
   }
 };
 
 const AFTER={
-  auth(){const e=document.getElementById('ae');if(e)e.focus()},
   async list(){
     for(const img of app.querySelectorAll('img[data-thumb]')){
       const it=S.items.find(i=>i.id===img.dataset.thumb);
@@ -438,31 +427,27 @@ const AFTER={
   }
 };
 
-/* ---------- Auth ---------- */
+/* ---------- Session (anonymous, no login) ---------- */
+async function ensureUser(){
+  const {data}=await sb.auth.getSession();
+  if(data.session)return data.session.user;
+  const res=await sb.auth.signInAnonymously();
+  if(res.error)throw res.error;
+  return res.data.user;
+}
 async function route(){
-  if(!S.user)return go('auth');
   go('loading');
-  try{S.profile=check(await sb.from('vaultx_profiles').select('*').eq('user_id',uid()).maybeSingle())}
-  catch(e){S.authMsg=errMsg(e);S.err=true;return go('auth')}
+  try{
+    S.user=await ensureUser();
+    S.profile=check(await sb.from('vaultx_profiles').select('*').eq('user_id',uid()).maybeSingle());
+  }catch(e){
+    S.offlineMsg=/anonymous/i.test(errMsg(e))?'The vault service is still being set up. Try again in a few minutes.':'Check your internet connection and try again.';
+    console.error(e);return go('offline');
+  }
   S.stage=S.profile?'enter':'create';S.pin='';S.msg='';S.err=false;
   go(S.profile&&LS.get('fake',false)?'error':'lock');
 }
-async function doAuth(b){
-  const email=document.getElementById('ae').value.trim(),password=document.getElementById('ap').value,err=document.getElementById('aerr');
-  err.style.color='';
-  if(!email||!password){err.textContent='Enter your email and password.';return}
-  if(S.authMode==='signup'&&password.length<8){err.textContent='Use at least 8 characters for your password.';return}
-  b.disabled=true;b.textContent='Please wait…';
-  const res=S.authMode==='signup'
-    ?await sb.auth.signUp({email,password,options:{emailRedirectTo:location.origin+location.pathname}})
-    :await sb.auth.signInWithPassword({email,password});
-  if(res.error){err.textContent=res.error.message;b.disabled=false;b.textContent=S.authMode==='signup'?'Create account':'Sign in';return}
-  if(!res.data.session){S.authMode='signin';S.err=false;S.authMsg='Check your email and tap the confirmation link, then sign in here.';return go('auth')}
-  S.user=res.data.user;S.authMsg='';route();
-}
-sb.auth.onAuthStateChange((ev,session)=>{
-  if(ev==='SIGNED_OUT'&&S.user){S.user=null;S.profile=null;clearSession();S.authMsg='';go('auth')}
-});
+sb.auth.onAuthStateChange(ev=>{if(ev==='SIGNED_OUT'&&S.user){S.user=null;S.profile=null;clearSession();route()}});
 
 /* ---------- Passcode ---------- */
 async function pinPress(d){
@@ -486,7 +471,7 @@ async function pinComplete(){
 function fail(m){S.pin='';S.msg=m;S.err=true;S.shake=true;render();setTimeout(()=>{S.shake=false;const d=app.querySelector('.dots');d&&d.classList.remove('shake')},450)}
 async function enter(){S.pin='';S.msg='Loading your vault…';render();await loadItems();S.msg='';go('home');armTimer()}
 function clearSession(){S.key=null;S.items=[];Object.keys(S.urls).forEach(dropURL);S.pin='';S.msg='';S.err=false;S.sad=0;clearTimeout(S.t)}
-function lock(){clearSession();if(!S.user)return go('auth');go(LS.get('fake',false)?'error':'lock')}
+function lock(){clearSession();if(!S.user)return route();go(LS.get('fake',false)?'error':'lock')}
 
 /* ---------- Auto-lock ---------- */
 function armTimer(){
@@ -546,11 +531,10 @@ picker.addEventListener('change',async()=>{
 const ACT={
   k:b=>pinPress(b.dataset.k),
   del(){if(S.busy)return;S.pin=S.pin.slice(0,-1);render()},
-  swapauth(){S.authMode=S.authMode==='signin'?'signup':'signin';S.authMsg='';go('auth')},
-  doauth:b=>doAuth(b),
+  noop(){},
+  retrystart(){route()},
   forgot(){
-    if(!hasVault())return sb.auth.signOut();
-    sheet('Forgot your passcode?',`<p>Your files are encrypted with your passcode, so they can't be recovered without it. You can erase the vault and start fresh, or sign out.</p><div class="row2"><button class="btn ghost" data-a="signout">Sign out</button><button class="btn danger" data-a="doerase">Erase vault</button></div>`);
+    sheet('Forgot your passcode?',`<p>Your files are encrypted with your passcode, so they can't be recovered without it. You can erase the vault and start fresh.</p><div class="row2"><button class="btn ghost" data-a="close">Keep trying</button><button class="btn danger" data-a="doerase">Erase vault</button></div>`);
   },
   go:b=>go(b.dataset.to),
   cat:b=>go('list',{cat:b.dataset.cat}),
@@ -613,7 +597,6 @@ const ACT={
   },
   erase(){confirmSheet('Erase vault?',"Every photo, video, file, note and link in your account will be deleted, along with your passcode. This can't be undone.",'Erase everything','doerase')},
   async doerase(b){b.disabled=true;try{await eraseVault();lock();toast('Vault erased')}catch(e){toast(errMsg(e));b.disabled=false}},
-  async signout(){clearSession();await sb.auth.signOut()},
   sad(){if(++S.sad>=5){S.sad=0;go('lock')}},
   retry(b){b.disabled=true;b.textContent='Loading…';setTimeout(()=>{b.disabled=false;b.textContent='Try again'},1600)},
   close(){closeSheet()}
@@ -621,7 +604,6 @@ const ACT={
 app.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b||b.disabled)return;const f=ACT[b.dataset.a];if(f)f(b,e)});
 document.addEventListener('keydown',e=>{
   if(app.querySelector('.overlay'))return;
-  if(S.screen==='auth'&&e.key==='Enter'){const b=app.querySelector('[data-a="doauth"]');if(b&&!b.disabled)doAuth(b);return}
   if(S.screen!=='lock')return;
   if(/^\d$/.test(e.key))pinPress(e.key);else if(e.key==='Backspace')ACT.del();
 });
@@ -629,9 +611,6 @@ document.addEventListener('keydown',e=>{
 /* ---------- Start ---------- */
 (async()=>{
   if(!window.crypto||!crypto.subtle){app.innerHTML='<section class="screen fake"><h2>VaultX needs a secure connection</h2><p>Open this site over https.</p></section>';return}
-  render();
-  const {data}=await sb.auth.getSession();
-  S.user=data.session?data.session.user:null;
   route();
 })();
 </script>
