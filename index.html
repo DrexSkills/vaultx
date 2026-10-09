@@ -431,7 +431,13 @@ const AFTER={
 async function ensureUser(){
   const {data}=await sb.auth.getSession();
   if(data.session)return data.session.user;
-  const res=await sb.auth.signInAnonymously();
+  let cred=LS.get('device',null);
+  if(!cred){
+    const r=await sb.functions.invoke('vaultx-device',{body:{}});
+    if(r.error||!r.data||!r.data.email)throw r.error||new Error('Could not set up this device');
+    cred={email:r.data.email,password:r.data.password};LS.set('device',cred);
+  }
+  const res=await sb.auth.signInWithPassword(cred);
   if(res.error)throw res.error;
   return res.data.user;
 }
@@ -441,7 +447,7 @@ async function route(){
     S.user=await ensureUser();
     S.profile=check(await sb.from('vaultx_profiles').select('*').eq('user_id',uid()).maybeSingle());
   }catch(e){
-    S.offlineMsg=/anonymous/i.test(errMsg(e))?'The vault service is still being set up. Try again in a few minutes.':'Check your internet connection and try again.';
+    S.offlineMsg='Check your internet connection and try again.';
     console.error(e);return go('offline');
   }
   S.stage=S.profile?'enter':'create';S.pin='';S.msg='';S.err=false;

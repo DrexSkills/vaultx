@@ -7,7 +7,7 @@ Your privacy. Your files. Your rules.
 A private vault for photos, videos, documents, notes and web links, backed by Supabase.
 
 ## How it works
-- No sign-up or login. On first open you create a 4-digit passcode; behind the scenes the browser gets a private anonymous Supabase session.
+- No sign-up or login. On first open you create a 4-digit passcode; behind the scenes the `vaultx-device` edge function creates a private Supabase account for that browser.
 - Everything is encrypted in your browser with AES-256 (key derived from your passcode with PBKDF2) **before** it's uploaded. Supabase only stores scrambled data.
 - Files go to a private Supabase Storage bucket (`vaultx`); notes, links and file details go to the `vaultx_items` table.
 - Row-level security means each account can only read its own rows and files.
@@ -26,7 +26,7 @@ A private vault for photos, videos, documents, notes and web links, backed by Su
 - Function: `vaultx_rekey` (atomic passcode change)
 - Storage bucket: `vaultx` (private, per-user folders)
 
-Required: in the Supabase dashboard, turn on **Authentication → Sign In / Providers → Allow anonymous sign-ins**.
+- Edge function: `vaultx-device` (creates a private account per browser, no email sent)
 
 ## Notes
 - There is no passcode recovery. If you forget it, you can only erase the vault.
